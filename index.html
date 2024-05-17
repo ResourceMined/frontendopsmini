@@ -5,20 +5,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Task Manager</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="https://unpkg.com/htmx.org"></script>
-  <script src="https://unpkg.com/htmx.org/dist/ext/json-enc.js"></script>
 </head>
 <body>
-  <h1>Task Manager</h1>
-  <div>
-    <label for="startDate">Start Date:</label>
-    <input type="date" id="startDate" name="startDate">
-    <label for="endDate">End Date:</label>
-    <input type="date" id="endDate" name="endDate">
-    <button onclick="loadTasks()">Load Tasks</button>
-  </div>
-  <div id="tasks">
-    <!-- Tasks will be displayed here -->
+  <div class="container">
+    <h1>Task Manager</h1>
+    <div class="controls">
+      <button onclick="loadTasksForToday()">Today</button>
+      <button onclick="loadTasksForYesterday()">Yesterday</button>
+      <button onclick="loadTasksForLast24Hours()">Last 24 Hours</button>
+      <button onclick="toggleCustomRange()">Custom Range</button>
+    </div>
+    <div id="customRange" class="custom-range" style="display: none;">
+      <label for="startDate">Start Date:</label>
+      <input type="date" id="startDate" name="startDate">
+      <label for="startShift">Start Shift:</label>
+      <select id="startShift" name="startShift">
+        <option value="day">Day Shift</option>
+        <option value="night">Night Shift</option>
+      </select>
+      <label for="endDate">End Date:</label>
+      <input type="date" id="endDate" name="endDate">
+      <label for="endShift">End Shift:</label>
+      <select id="endShift" name="endShift">
+        <option value="day">Day Shift</option>
+        <option value="night">Night Shift</option>
+      </select>
+      <button onclick="loadTasksForCustomRange()">Load Tasks</button>
+    </div>
+    <div class="tasks-layout">
+      <div id="tasks" class="tasks-container">
+        <!-- Tasks will be displayed here -->
+      </div>
+      <div id="taskModal" class="modal">
+        <!-- Task details will be displayed here -->
+      </div>
+    </div>
   </div>
   <script src="script.js"></script>
 </body>
