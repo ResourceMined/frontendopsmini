@@ -1,0 +1,10 @@
+/project-directory
+  /index.html
+  /styles.css
+  /script.js
+  /serverproxy.js
+  /.env
+  /.gitignore
+  /node_modules
+  /package.json
+  /package-lock.json
