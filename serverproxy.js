@@ -2,9 +2,11 @@ const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
 const https = require('https');
+const sqlite3 = require('sqlite3').verbose();
 require('dotenv').config();
 
 const app = express();
+const db = new sqlite3.Database('task_cache.db');
 
 const API_URL = process.env.API_URL || 'https://opstanamitest.newmont.com/api/external/v3.7/ShiftWorkItems';
 const API_TOKEN = process.env.API_TOKEN;
@@ -13,6 +15,28 @@ const WORKPLACE_URL = process.env.WORKPLACE_URL;
 const MATERIAL_URL = process.env.MATERIAL_URL;
 const METRIC_URL = process.env.METRIC_URL;
 const SHIFT_URL = process.env.SHIFT_URL || 'https://opstanamitest.newmont.com/api/external/v3.7/Shifts';
+
+// Initialize database table (run once)
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS task_cache (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        request_url TEXT UNIQUE,
+        data TEXT,
+        timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`);
+});
+
+// Cache Data Function
+async function cacheTasks(startDate, endDate, data) {
+    const requestUrl = `/proxy/tasks?StartDate=${startDate}&EndDate=${endDate}`;
+    db.run(`INSERT OR REPLACE INTO task_cache (request_url, data) VALUES (?, ?)`, [requestUrl, JSON.stringify(data)]);
+}
+
+// Check if cached data is recent (e.g., within 1 hour)
+function isDataRecent(timestamp) {
+    const hourInMilliseconds = 60 * 60 * 1000;
+    return Date.now() - new Date(timestamp) < hourInMilliseconds;
+}
 
 // Use CORS middleware
 app.use(cors());
@@ -111,18 +135,27 @@ const enhanceTaskData = async (tasks, startDate, endDate) => {
 
 // Endpoint for fetching tasks
 app.get('/proxy/tasks', async (req, res) => {
-  try {
     const { StartDate, EndDate } = req.query;
-    if (!StartDate || !EndDate) {
-      return res.status(400).json({ message: 'StartDate and EndDate are required.' });
-    }
 
-    const data = await fetchData(API_URL, API_TOKEN, { StartDate, EndDate });
-    const enhancedData = await enhanceTaskData(data.WorkItems, StartDate, EndDate);
-    res.json({ WorkItems: enhancedData });
-  } catch (error) {
-    handleError(res, error);
-  }
+    // Check Cache
+    db.get('SELECT * FROM task_cache WHERE request_url = ?', [req.url], async (err, cachedData) => {
+        if (err) {
+            return handleError(res, err); // Handle database errors
+        }
+        if (cachedData && isDataRecent(cachedData.timestamp)) {
+            return res.json(JSON.parse(cachedData.data)); // Return from cache
+        }
+
+        // Fetch and Update Cache
+        try {
+            const data = await fetchData(API_URL, API_TOKEN, { StartDate, EndDate });
+            const enhancedData = await enhanceTaskData(data.WorkItems, StartDate, EndDate);
+            await cacheTasks(StartDate, EndDate, enhancedData); // Cache the new data
+            res.json({ WorkItems: enhancedData });
+        } catch (error) {
+            handleError(res, error);
+        }
+    });
 });
 
 // Error handling function
