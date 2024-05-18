@@ -1,262 +1,262 @@
-function loadTasks() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const startShift = document.getElementById('startShift').value;
-    const endShift = document.getElementById('endShift').value;
-    if (startDate && endDate) {
-      loadTasksForShiftRange(startDate, endDate, startShift, endShift);
-    } else {
-      alert('Please select both start and end dates');
-    }
-  }
-  
-  function loadTasksForToday() {
-    const today = new Date().toISOString().split('T')[0];
-    loadTasksForShiftRange(today, today, 'day', 'day');
-  }
-  
-  function loadTasksForYesterday() {
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
-    loadTasksForShiftRange(yesterdayStr, yesterdayStr, 'day', 'day');
-  }
-  
-  function loadTasksForLast24Hours() {
-    const now = new Date();
-    const start = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString().slice(0, 16);
-    const end = now.toISOString().slice(0, 16);
-    loadTasksForShiftRange(start, end, 'day', 'day');
-  }
-  
-  function toggleCustomRange() {
-    const customRange = document.getElementById('customRange');
-    customRange.style.display = customRange.style.display === 'none' ? 'flex' : 'none';
-  }
-  
-  function loadTasksForCustomRange() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const startShift = document.getElementById('startShift').value;
-    const endShift = document.getElementById('endShift').value;
-    if (startDate && endDate) {
-      loadTasksForShiftRange(startDate, endDate, startShift, endShift);
-    } else {
-      alert('Please select both start and end dates');
-    }
-  }
-  
-  function loadTasksForShiftRange(startDate, endDate, startShift, endShift) {
-    let startDateTime, endDateTime;
-    if (startShift === 'day') {
-      startDateTime = `${startDate}T06:00:00Z`;
-    } else {
-      startDateTime = `${startDate}T18:00:00Z`;
-    }
-  
-    if (endShift === 'day') {
-      endDateTime = `${endDate}T18:00:00Z`;
-    } else {
-      endDateTime = new Date(new Date(endDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0] + 'T06:00:00Z';
-    }
-  
-    const url = `http://localhost:3000/proxy/tasks?StartDate=${encodeURIComponent(startDateTime)}&EndDate=${encodeURIComponent(endDateTime)}`;
-    fetch(url)
-      .then(response => response.json())
-      .then(data => {
-        if (data.WorkItems) {
-          displayTasks(data.WorkItems);
-        } else {
-          console.error('Error fetching tasks:', data);
-          alert(`Error: ${data.message}`);
-        }
-      })
-      .catch(error => console.error('Error fetching tasks:', error));
-  }
-  
-  function displayTasks(workItems) {
-    const tasksContainer = document.getElementById('tasks');
-    const taskModal = document.getElementById('taskModal');
-    tasksContainer.innerHTML = '';
-    taskModal.innerHTML = '';
-    taskModal.classList.remove('active');
-    
-    const groupedByShift = groupBy(workItems, 'ShiftId');
-  
-    for (const [shiftId, tasks] of Object.entries(groupedByShift)) {
-      const shiftElement = document.createElement('div');
-      shiftElement.classList.add('shift');
-      const shiftName = tasks[0].ShiftName; // Assuming all tasks have the same ShiftName in the group
-      shiftElement.innerHTML = `<h2>${shiftName}</h2>`;
-  
-      const groupedByActivity = groupBy(tasks, 'ActivityType');
-      
-      for (const [activityType, activityTasks] of Object.entries(groupedByActivity)) {
-        const activityElement = document.createElement('div');
-        activityElement.classList.add('activity');
-        activityElement.innerHTML = `<h3>${activityType}</h3>`;
-        
-        activityTasks.forEach(task => {
-          const taskElement = document.createElement('div');
-          taskElement.classList.add('task');
-          taskElement.style.backgroundColor = task.ActivityColor;
-          if (task.IsComplete) {
-            taskElement.style.opacity = '1';
-          } else {
-            taskElement.style.opacity = '0.5';
-          }
-          const isDarkColor = isDark(task.ActivityColor);
-          taskElement.classList.toggle('black-text', !isDarkColor);
-          taskElement.innerHTML = `
-            <span>Task: ${task.ActivityType}</span>
-            <span>Location: ${task.Location}</span>
-          `;
-          taskElement.addEventListener('click', () => showTaskDetails(task));
-          activityElement.appendChild(taskElement);
-        });
-  
-        shiftElement.appendChild(activityElement);
-      }
-  
-      tasksContainer.appendChild(shiftElement);
-    }
-  }
-  
-  function showTaskDetails(task) {
-    const taskModal = document.getElementById('taskModal');
-    taskModal.innerHTML = `
-      <h2>Task Details</h2>
-      <p><strong>Activity Type:</strong> ${task.ActivityType}</p>
-      <p><strong>Location:</strong> ${task.Location}</p>
-      <p><strong>Start DateTime:</strong> ${task.StartDateTime}</p>
-      <p><strong>Finish DateTime:</strong> ${task.FinishDateTime}</p>
-      <p><strong>Planned Quantity:</strong> ${task.PlannedQuantity}</p>
-      <p><strong>Material:</strong> ${task.Material}</p>
-      <p><strong>Planned Metrics:</strong></p>
-      <ul>
-        ${task.PlannedMetrics.map(metric => `<li>${metric.Metric}: ${metric.Value}</li>`).join('')}
-      </ul>
-      <p><strong>Actual Production Records:</strong></p>
-      ${task.ActualProductionRecords.map(record => `
-        <div>
-          <p><strong>Production Record ID:</strong> ${record.ProductionRecordId}</p>
-          <p><strong>Material:</strong> ${record.Material}</p>
-          <ul>
-            ${record.ActualMetrics.map(metric => `<li>${metric.Metric}: ${metric.Value}</li>`).join('')}
-          </ul>
-        </div>
-      `).join('')}
-      <p><strong>Current Status:</strong>
-        <select id="currentStatus">
-          <option value="notstarted" ${task.CurrentStatus === 'notstarted' ? 'selected' : ''}>Not Started</option>
-          <option value="inprogress" ${task.CurrentStatus === 'inprogress' ? 'selected' : ''}>In Progress</option>
-          <option value="finished" ${task.CurrentStatus === 'finished' ? 'selected' : ''}>Finished</option>
-<p><strong>Custom Start Time:</strong> <input type="datetime-local" id="customStartTime"></p>
-    <p><strong>Custom Finish Time:</strong> <input type="datetime-local" id="customFinishTime"></p>
-    <button id="updateTaskBtn">Update</button>
-  `;
+let currentDate = new Date();
+console.log("Current date:", currentDate);
 
-  const updateTaskBtn = document.getElementById('updateTaskBtn');
-  updateTaskBtn.addEventListener('click', () => updateTask(task));
-
-  taskModal.classList.add('active');
+function convertToDarwinTime(date) {
+  const darwinOffset = 0; // 9.5 hours in milliseconds
+  return new Date(date.getTime() + darwinOffset);
 }
 
-  function updateTask(task) {
-    const currentStatus = document.getElementById('currentStatus').value;
-  
-    if (currentStatus === 'notstarted') {
-      startTask(task);
-    } else if (currentStatus === 'finished') {
-      finishTask(task);
-    }
-  }
-  
-  function startTask(task) {
-    const data = {
-      ActivityRecordId: task.Id,
-      ActivityDistributionIndex: 1,
-      ResourceId: task.PrimaryResource,
-      OperatorId: task.PrimaryResource,
-      ExternalId: `ABC-${Math.floor(Math.random() * 1000000000)}`,
-      ActualStartDateTime: new Date().toISOString()
-    };
-  
-    fetch('http://localhost:3000/proxy/startTask', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
+function loadShifts() {
+  const startDate = new Date(currentDate.getTime() - 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+  const endDate = new Date(currentDate.getTime() + 7 * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .split("T")[0];
+
+  fetch(`http://localhost:3000/proxy/shifts?StartDate=${startDate}&EndDate=${endDate}`)
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.Shifts) {
+        displayShiftButtons(data.Shifts);
+      } else {
+        console.error("Error fetching shifts:", data);
+        alert(`Error: ${data.message}`);
+      }
     })
-      .then(response => response.json())
-      .then(data => {
-        console.log('Task started:', data);
-        task.CurrentStatus = 'inprogress';
-        loadTasks();
-      })
-      .catch(error => {
-        console.error('Error starting task:', error);
-        alert('An error occurred while starting the task.');
-      });
+    .catch((error) => console.error("Error fetching shifts:", error));
+}
+
+let selectedShiftButton = null;
+
+function displayShiftButtons(shifts) {
+  const shiftWheel = document.getElementById("shiftWheel");
+  shiftWheel.innerHTML = "";
+
+  // Sort shifts with NS before DS for the same date
+  shifts.sort((a, b) => {
+    if (a.ShiftDate === b.ShiftDate) {
+      return a.ShiftCode === "NS" ? -1 : 1;
+    }
+    return new Date(b.ShiftDate) - new Date(a.ShiftDate);
+  });
+
+  shifts.forEach((shift) => {
+    const button = document.createElement("button");
+    const shiftDate = new Date(`${shift.ShiftDate}T07:00:00Z`);
+    const darwinDate = convertToDarwinTime(shiftDate);
+
+    const formattedDate = darwinDate.toLocaleDateString("en-AU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "2-digit",
+    });
+    button.textContent = `${formattedDate} - ${shift.ShiftCode}`;
+
+    button.addEventListener("click", () => {
+      if (selectedShiftButton) {
+        selectedShiftButton.classList.remove("selected");
+      }
+      selectedShiftButton = button;
+      button.classList.add("selected");
+      loadTasksForShift(shift);
+    });
+
+    if (shift.ShiftDate === currentDate.toISOString().split("T")[0]) {
+      button.classList.add("today");
+    }
+
+    shiftWheel.appendChild(button);
+  });
+}
+
+function loadTasksForShift(shift) {
+  currentShift = shift;
+
+  let startDate = new Date(`${shift.ShiftDate}T${shift.ShiftStartTime}:00Z`);
+  let endDate;
+
+  if (shift.ShiftCode === "NS") {
+    // Night Shift: End date should be the next day at 07:00
+    endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 1);
+    endDate.setUTCHours(7, 0, 0, 0); // Set end time to 07:00:00.000
+  } else {
+    // Day Shift: End date is 12 hours after start date
+    endDate = new Date(startDate.getTime() + 12 * 60 * 60 * 1000);
   }
-  
-  function finishTask(task) {
-    const data = {
-      ActivityRecordId: task.ActivityRecordId,
-      ActivityDistributionIndex: task.ActivityDistributionIndex,
-      ActualStartDateTime: task.StartDateTime, // Use the default start time from the task data
-      ActualFinishDateTime: task.FinishDateTime, // Use the default finish time from the task data
-      ExternalId: `ABC-${Math.floor(Math.random() * 100000000)}`
-    };
-  
-    // Check if custom start and finish times are provided
-    const customStartTime = document.getElementById('customStartTime').value;
-    const customFinishTime = document.getElementById('customFinishTime').value;
-  
-    if (customStartTime) {
-      data.ActualStartDateTime = customStartTime;
-    }
-  
-    if (customFinishTime) {
-      data.ActualFinishDateTime = customFinishTime;
-    }
-  
-    fetch('http://localhost:3000/proxy/finishTask', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
+
+  startDate = startDate.toISOString();
+  endDate = endDate.toISOString();
+
+  console.log("Start Date:", startDate);
+  console.log("End Date:", endDate);
+  console.log("Shift:", shift);
+  console.log("Current Shift:", currentShift);
+
+  fetch(`http://localhost:3000/proxy/tasks?StartDate=${startDate}&EndDate=${endDate}`)
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.WorkItems) {
+        displayTasks(data.WorkItems);
+      } else {
+        console.error("Error fetching tasks:", data);
+        alert(`Error: ${data.message}`);
+      }
     })
-      .then(response => response.json())
-      .then(data => {
-        console.log('Task finished:', data);
-        task.CurrentStatus = 'finished';
-        loadTasks();
-      })
-      .catch(error => {
-        console.error('Error finishing task:', error);
-        alert('An error occurred while finishing the task.');
-      });
+    .catch((error) => console.error("Error fetching tasks:", error));
+}
+
+function displayTasks(workItems) {
+  const tasksContainer = document.getElementById("tasks");
+  const taskModal = document.getElementById("taskModal");
+  tasksContainer.innerHTML = "";
+  taskModal.innerHTML = "";
+  taskModal.classList.remove("active");
+
+  const groupedByActivity = groupBy(workItems, "ActivityType");
+
+  for (const [activityType, activityTasks] of Object.entries(groupedByActivity)) {
+    const activityElement = document.createElement("div");
+    activityElement.classList.add("activity");
+    activityElement.innerHTML = `<h3>${activityType}</h3>`;
+
+    activityTasks.forEach((task) => {
+      const taskElement = document.createElement("div");
+      taskElement.classList.add("task");
+      taskElement.style.backgroundColor = task.ActivityColor;
+      if (task.IsComplete) {
+        taskElement.style.opacity = '1';
+      } else {
+        taskElement.style.opacity = '0.5';
+      }
+      const isDarkColor = isDark(task.ActivityColor);
+      taskElement.classList.toggle('black-text', !isDarkColor);
+      taskElement.innerHTML = `
+        <span>Task: ${task.ActivityType}</span>
+        <span>Location: ${task.Location}</span>
+      `;
+      taskElement.addEventListener("click", () => showTaskDetails(task));
+      activityElement.appendChild(taskElement);
+    });
+
+    tasksContainer.appendChild(activityElement);
   }
-  
-  
-  // Helper function to group array items by key
-  function groupBy(array, key) {
-    return array.reduce((result, currentValue) => {
-      (result[currentValue[key]] = result[currentValue[key]] || []).push(currentValue);
-      return result;
-    }, {});
-  }
-  
-  // Helper function to determine if a color is dark
-  function isDark(color) {
-    const rgb = color.replace(/[^\d,]/g, '').split(',');
-    const r = parseInt(rgb[0]);
-    const g = parseInt(rgb[1]);
-    const b = parseInt(rgb[2]);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness < 128;
-  }
-  
+}
+
+function showTaskDetails(task) {
+  const taskModal = document.getElementById("taskModal");
+  taskModal.innerHTML = `
+    <h2>Task Details</h2>
+    <p><strong>Activity Type:</strong> ${task.ActivityType}</p>
+    <p><strong>Location:</strong> ${task.Location}</p>
+    <p><strong>Start DateTime:</strong> ${task.StartDateTime}</p>
+    <p><strong>Finish DateTime:</strong> ${task.FinishDateTime}</p>
+    <p><strong>Planned Quantity:</strong> ${task.PlannedQuantity}</p>
+    <p><strong>Material:</strong> ${task.Material}</p>
+    <p><strong>Planned Metrics:</strong></p>
+    <ul>
+      ${task.PlannedMetrics.map(
+        (metric) => `<li>${metric.Metric}: ${metric.Value}</li>`
+      ).join("")}
+    </ul>
+    <div id="actualMetrics"></div>
+    <button id="finishTaskBtn">Finish Task</button>
+  `;
+
+  const actualMetricsContainer = document.getElementById("actualMetrics");
+  actualMetricsContainer.innerHTML = `
+    <h3>Actual Metrics:</h3>
+    ${task.PlannedMetrics.map(
+      (metric) => `
+      <div>
+        <label>${metric.Metric}:</label>
+        <input type="number" id="actual-${metric.MetricId}" value="${metric.Value}">
+      </div>
+    `
+    ).join("")}
+  `;
+
+
+  const finishTaskBtn = document.getElementById("finishTaskBtn");
+  finishTaskBtn.addEventListener("click", () => finishTask(task));
+
+  taskModal.classList.add("active");
+}
+
+function finishTask(task) {
+  const actualMetrics = task.PlannedMetrics.map((metric) => {
+    const actualValue = document.getElementById(
+      `actual-${metric.MetricId}`
+    ).value;
+    return {
+      MetricId: metric.MetricId,
+      Value: actualValue,
+    };
+  });
+
+  const data = {
+    ActivityRecordId: task.ActivityRecordId,
+    ActivityDistributionIndex: task.ActivityDistributionIndex,
+    ActualStartDateTime: task.StartDateTime,
+    ActualFinishDateTime: task.FinishDateTime,
+    ActivityIsComplete: true,
+    OverrideRemainingQuantity: null,
+    ActualProductionRecords: [
+      {
+        ProductionRecordId:
+          task.ActualProductionRecords[0]?.ProductionRecordId || "",
+        ExternalId: null,
+        MaterialId: task.PlannedMaterialId || "",
+        DestinationId: task.PlannedDestinationId || "",
+        OperatorId: task.PrimaryResource?.ResourceId || "",
+        SourceId: task.PlannedSourceId || "",
+        ActualMetrics: actualMetrics,
+        RecordedDateTime: new Date().toISOString(),
+      },
+    ],
+    PercentComplete: 100,
+    ExternalId: `ABC-${Math.floor(Math.random() * 100000000)}`,
+  };
+
+  fetch("http://localhost:3000/proxy/finishTask", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  })
+    .then((response) => response.json())
+    .then((data) => {
+      console.log("Task finished:", data);
+      task.CurrentStatus = "finished";
+      loadTasksForShift(currentShift); // Reload tasks for the current shift
+    })
+    .catch((error) => {
+      console.error("Error finishing task:", error);
+      alert("An error occurred while finishing the task.");
+    });
+}
+
+// Helper function to group array items by key
+function groupBy(array, key) {
+  return array.reduce((result, currentValue) => {
+    (result[currentValue[key]] = result[currentValue[key]] || []).push(
+      currentValue
+    );
+    return result;
+  }, {});
+}
+
+// Helper function to determine if a color is dark
+function isDark(color) {
+  const rgb = color.replace(/[^\d,]/g, "").split(",");
+  const r = parseInt(rgb[0]);
+  const g = parseInt(rgb[1]);
+  const b = parseInt(rgb[2]);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness < 128;
+}
+
+// Load shifts when the page loads
+window.addEventListener("DOMContentLoaded", loadShifts);

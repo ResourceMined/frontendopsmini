@@ -1,142 +1,150 @@
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background-color: #f4f6f9;
-    color: #333;
-    margin: 0;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    height: 100vh;
-  }
-  
-  .container {
-    background-color: #fff;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    padding: 20px;
-    width: 90%;
-    max-width: 1200px;
-    margin: 20px;
-  }
-  
-  h1 {
-    text-align: center;
-    margin-bottom: 20px;
-    font-size: 2em;
-    color: #4CAF50;
-  }
-  
-  .controls {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-  
-  .controls button {
-    padding: 10px 20px;
-    font-size: 1em;
-    background-color: #4CAF50;
-    color: white;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-  }
-  
-  .controls button:hover {
-    background-color: #45a049;
-  }
-  
-  .custom-range {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-  }
-  
-  .custom-range label {
-    margin-right: 10px;
-  }
-  
-  .custom-range input, .custom-range select {
-    padding: 5px;
-    font-size: 1em;
-  }
-  
-  .tasks-layout {
-    display: flex;
-  }
-  
-  .tasks-container {
-    flex: 1;
-    max-height: 60vh;
-    overflow-y: auto;
-    margin-right: 20px;
-  }
-  
-  .shift {
-    margin-bottom: 20px;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    overflow: hidden;
-  }
-  
-  .shift h2 {
-    background-color: #4CAF50;
-    color: white;
-    margin: 0;
-    padding: 10px;
-    font-size: 1.2em;
-  }
-  
-  .task {
-    padding: 10px;
-    margin: 10px;
-    border-radius: 5px;
-    position: relative;
-    cursor: pointer;
-    transition: box-shadow 0.3s;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: white;
-  }
-  
-  .task.black-text {
-    color: black;
-  }
-  
-  .task:hover {
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  }
-  
-  .modal {
-    flex: 1;
-    display: none;
-    background-color: white;
-    border: 1px solid #ccc;
-    padding: 20px;
-    position: relative;
-    z-index: 10;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-    border-radius: 5px;
-    max-height: 60vh;
-    overflow-y: auto;
-  }
-  
-  .modal.active {
-    display: block;
-  }
-  
-  .modal p {
-    margin: 5px 0;
-  }
-  
-  .modal ul {
-    padding-left: 20px;
-  }
-  
-  .modal ul li {
-    list-style-type: disc;
-  }
-  
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f4f6f9;
+  color: #333;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+.container {
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  width: 90%;
+  max-width: 1200px;
+  margin: 20px;
+}
+
+h1 {
+  text-align: center;
+  margin-bottom: 20px;
+  font-size: 2em;
+  color: #4CAF50;
+}
+
+.main-layout {
+  display: flex;
+}
+
+.shift-navigation {
+  width: 150px;
+  margin-right: 20px;
+}
+
+.wheel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100vh;
+  overflow-y: auto;
+}
+
+.wheel button {
+  width: 100%;
+  padding: 10px;
+  border-radius: 5px;
+  background-color: #f1f1f1;
+  color: #333;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  margin-bottom: 5px;
+  text-align: left;
+}
+
+.wheel button:hover {
+  background-color: #ddd;
+}
+
+.wheel button.today {
+  background-color: #4CAF50;
+  color: white;
+}
+
+.wheel button.selected {
+  background-color: #2196F3;
+  color: white;
+}
+
+.tasks-layout {
+  flex: 1;
+  display: flex;
+}
+
+.tasks-container {
+  flex: 1;
+  max-height: 100vh;
+  overflow-y: auto;
+  margin-right: 20px;
+}
+
+.activity {
+  margin-bottom: 20px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.activity h3 {
+  background-color: #4CAF50;
+  color: white;
+  margin: 0;
+  padding: 10px;
+  font-size: 1.2em;
+}
+
+.task {
+  padding: 10px;
+  margin: 10px;
+  border-radius: 5px;
+  position: relative;
+  cursor: pointer;
+  transition: box-shadow 0.3s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: white;
+}
+
+.task.black-text {
+  color: black;
+}
+
+.task:hover {
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.modal {
+  flex: 1;
+  display: none;
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 20px;
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 5px;
+  max-height: 100vh;
+  overflow-y: auto;
+}
+
+.modal.active {
+  display: block;
+}
+
+.modal p {
+  margin: 5px 0;
+}
+
+.modal ul {
+  padding-left: 20px;
+}
+
+.modal ul li {
+  list-style-type: disc;
+}
