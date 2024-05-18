@@ -29,7 +29,11 @@ db.serialize(() => {
 // Cache Data Function
 async function cacheTasks(startDate, endDate, data) {
     const requestUrl = `/proxy/tasks?StartDate=${startDate}&EndDate=${endDate}`;
-    db.run(`INSERT OR REPLACE INTO task_cache (request_url, data) VALUES (?, ?)`, [requestUrl, JSON.stringify(data)]);
+    db.run(`INSERT OR REPLACE INTO task_cache (request_url, data) VALUES (?, ?)`, [requestUrl, JSON.stringify(data)], (err) => {
+        if (err) {
+            console.error('Error caching tasks:', err);
+        }
+    });
 }
 
 // Check if cached data is recent (e.g., within 1 hour)
@@ -40,97 +44,114 @@ function isDataRecent(timestamp) {
 
 // Use CORS middleware
 app.use(cors());
+app.use(express.json());
 
 // Create an https agent to ignore SSL certificate
 const agent = new https.Agent({
-  rejectUnauthorized: false
+    rejectUnauthorized: false
 });
 
 // Function to fetch data from an API
 const fetchData = async (url, token, params) => {
-  const response = await axios.get(url, {
-    headers: {
-      'Accept': 'application/json',
-      'ApiToken': token
-    },
-    params,
-    httpsAgent: agent
-  });
-  return response.data;
+    try {
+        const response = await axios.get(url, {
+            headers: {
+                'Accept': 'application/json',
+                'ApiToken': token
+            },
+            params,
+            httpsAgent: agent
+        });
+        return response.data;
+    } catch (error) {
+        console.error('Error fetching data:', error);
+        throw error;
+    }
 };
 
 // Fetch and cache all necessary details concurrently
 const fetchAllDetails = async (startDate, endDate) => {
-  const [activityDefinitionsData, workplacesData, materialsData, metricsData, shiftsData] = await Promise.all([
-    fetchData(ACTIVITY_DEFINITION_URL, API_TOKEN),
-    fetchData(WORKPLACE_URL, API_TOKEN),
-    fetchData(MATERIAL_URL, API_TOKEN),
-    fetchData(METRIC_URL, API_TOKEN),
-    fetchData(SHIFT_URL, API_TOKEN, { StartDate: startDate, EndDate: endDate })
-  ]);
+    try {
+        const [activityDefinitionsData, workplacesData, materialsData, metricsData, shiftsData] = await Promise.all([
+            fetchData(ACTIVITY_DEFINITION_URL, API_TOKEN),
+            fetchData(WORKPLACE_URL, API_TOKEN),
+            fetchData(MATERIAL_URL, API_TOKEN),
+            fetchData(METRIC_URL, API_TOKEN),
+            fetchData(SHIFT_URL, API_TOKEN, { StartDate: startDate, EndDate: endDate })
+        ]);
 
-  return {
-    activityDefinitions: new Map(activityDefinitionsData.ActivityDefinitions.map(ad => [ad.Id, ad])),
-    workplaces: new Map(workplacesData.Locations.map(wp => [wp.Id, wp])),
-    materials: new Map(materialsData.Materials.map(mat => [mat.Id, mat])),
-    metrics: new Map(metricsData.Metrics.map(met => [met.Id, met])),
-    shifts: new Map(shiftsData.Shifts.map(shift => [shift.Id, shift]))
-  };
+        return {
+            activityDefinitions: new Map(activityDefinitionsData.ActivityDefinitions.map(ad => [ad.Id, ad])),
+            workplaces: new Map(workplacesData.Locations.map(wp => [wp.Id, wp])),
+            materials: new Map(materialsData.Materials.map(mat => [mat.Id, mat])),
+            metrics: new Map(metricsData.Metrics.map(met => [met.Id, met])),
+            shifts: new Map(shiftsData.Shifts.map(shift => [shift.Id, shift]))
+        };
+    } catch (error) {
+        console.error('Error fetching details:', error);
+        throw error;
+    }
 };
 
 // Enhance task data with readable information
 const enhanceTaskData = async (tasks, startDate, endDate) => {
-  const { activityDefinitions, workplaces, materials, metrics, shifts } = await fetchAllDetails(startDate, endDate);
+    try {
+        const { activityDefinitions, workplaces, materials, metrics, shifts } = await fetchAllDetails(startDate, endDate);
 
-  return tasks.flatMap(task => {
-    const activityDefinition = activityDefinitions.get(task.ActivityDefinitionId);
-    const workplace = workplaces.get(task.WorkplaceId);
-    const material = materials.get(task.PlannedMaterialId);
+        return tasks.flatMap(task => {
+            const activityDefinition = activityDefinitions.get(task.ActivityDefinitionId);
+            const workplace = workplaces.get(task.WorkplaceId);
+            const material = materials.get(task.PlannedMaterialId);
 
-    const plannedMetrics = task.PlannedMetrics.map(metric => {
-      const metricInfo = metrics.get(metric.MetricId);
-      return {
-        Metric: metricInfo ? metricInfo.Name : 'Unknown',
-        Value: metric.Value
-      };
-    });
+            const plannedMetrics = task.PlannedMetrics.map(metric => {
+                const metricInfo = metrics.get(metric.MetricId);
+                return {
+                    Metric: metricInfo ? metricInfo.Name : 'Unknown',
+                    Value: metric.Value
+                };
+            });
 
-    const actualMetrics = task.ActualProductionRecords.map(record => {
-      return record.ActualMetrics.map(metric => {
-        const metricInfo = metrics.get(metric.MetricId);
-        return {
-          Metric: metricInfo ? metricInfo.Name : 'Unknown',
-          Value: metric.Value
-        };
-      });
-    });
+            const actualMetrics = task.ActualProductionRecords.map(record => {
+                return record.ActualMetrics.map(metric => {
+                    const metricInfo = metrics.get(metric.MetricId);
+                    return {
+                        Metric: metricInfo ? metricInfo.Name : 'Unknown',
+                        Value: metric.Value
+                    };
+                });
+            });
 
-    // Create task entries for each shift
-    return task.ShiftIds.map(shiftId => {
-      const shift = shifts.get(shiftId);
-      return {
-        ShiftId: shiftId,
-        ShiftName: shift ? `${shift.ShiftDate}: ${shift.ShiftName}` : 'Unknown',
-        ActivityType: activityDefinition ? activityDefinition.Name : 'Unknown',
-        ActivityColor: activityDefinition ? activityDefinition.Color : '#000000',
-        Location: workplace ? workplace.Name : 'Unknown',
-        StartDateTime: task.StartDateTime,
-        FinishDateTime: task.FinishDateTime,
-        PlannedQuantity: task.PlannedQuantity,
-        Material: material ? material.Name : 'Unknown',
-        PlannedMetrics: plannedMetrics,
-        ActualProductionRecords: task.ActualProductionRecords.map((record, index) => ({
-          ...record,
-          Material: material ? material.Name : 'Unknown',
-          ActualMetrics: actualMetrics[index]
-        })),
-        CurrentStatus: task.CurrentStatus,
-        IsComplete: task.CurrentStatus === 'finished',
-        PrimaryResource: task.PrimaryResource,
-        SupportingResources: task.SupportingResources
-      };
-    });
-  });
+            // Create task entries for each shift
+            return task.ShiftIds.map(shiftId => {
+                const shift = shifts.get(shiftId);
+                return {
+                    Id: task.Id, // Include the Id field
+                    ShiftId: shiftId,
+                    ShiftName: shift ? `${shift.ShiftDate}: ${shift.ShiftName}` : 'Unknown',
+                    ActivityType: activityDefinition ? activityDefinition.Name : 'Unknown',
+                    ActivityColor: activityDefinition ? activityDefinition.Color : '#000000',
+                    Location: workplace ? workplace.Name : 'Unknown',
+                    StartDateTime: task.StartDateTime,
+                    FinishDateTime: task.FinishDateTime,
+                    PlannedQuantity: task.PlannedQuantity,
+                    Material: material ? material.Name : 'Unknown',
+                    PlannedMetrics: plannedMetrics,
+                    ActualProductionRecords: task.ActualProductionRecords.map((record, index) => ({
+                        ...record,
+                        Material: material ? material.Name : 'Unknown',
+                        ActualMetrics: actualMetrics[index]
+                    })),
+                    CurrentStatus: task.CurrentStatus,
+                    IsComplete: task.CurrentStatus === 'finished',
+                    PrimaryResource: task.PrimaryResource,
+                    SupportingResources: task.SupportingResources
+                };
+            });
+        });
+    } catch (error) {
+        console.error('Error enhancing task data:', error);
+        throw error;
+    }
 };
 
 // Endpoint for fetching tasks
@@ -160,30 +181,72 @@ app.get('/proxy/tasks', async (req, res) => {
 
 // Error handling function
 const handleError = (res, error) => {
-  console.error('Error fetching data:', error);
-  if (error.response) {
-    console.error('Response data:', error.response.data);
-    console.error('Response status:', error.response.status);
-    console.error('Response headers:', error.response.headers);
-    res.status(error.response.status).json({
-      message: 'Error in response from API',
-      data: error.response.data
-    });
-  } else if (error.request) {
-    console.error('Request data:', error.request);
-    res.status(500).json({
-      message: 'No response received from API',
-      request: error.request
-    });
-  } else {
-    console.error('Error message:', error.message);
-    res.status(500).json({
-      message: 'Error in setting up API request',
-      error: error.message
-    });
-  }
+    console.error('Error fetching data:', error);
+    const errorResponse = {
+        message: 'An error occurred',
+        error: {
+            message: error.message,
+            ...(error.response && {
+                response: {
+                    data: error.response.data,
+                    status: error.response.status,
+                    headers: error.response.headers
+                }
+            }),
+            ...(error.request && { request: 'Request made but no response received' })
+        }
+    };
+    res.status(error.response ? error.response.status : 500).json(errorResponse);
 };
 
+// Endpoint for updating tasks
+app.post('/proxy/updateTask', async (req, res) => {
+    try {
+        const taskId = req.query.taskId;
+        console.log("Received Task ID: ", taskId); // Log the received taskId
+        if (!taskId) {
+            return res.status(400).json({ error: 'Task ID is required' });
+        }
+
+        const { Details, CurrentStatus } = req.body;
+        console.log("Received Details: ", JSON.stringify(Details, null, 2)); // Log the received Details
+
+        // Ensure ActualProductionRecords is not empty
+        if (!Details[0].ActualProductionRecords || Details[0].ActualProductionRecords.length === 0) {
+            return res.status(400).json({ error: 'ActualProductionRecords must contain at least one record' });
+        }
+
+        const updateData = {
+            Details: [
+                {
+                    ActivityRecordId: taskId,
+                    ActivityRecordExternalId: Details[0].ActivityRecordExternalId,
+                    ActivityDistributionIndex: Details[0].ActivityDistributionIndex,
+                    ActualProductionRecords: Details[0].ActualProductionRecords
+                }
+            ],
+            CurrentStatus: CurrentStatus
+        };
+
+        const response = await axios.post(
+            'https://opstanamitest.newmont.com/api/external/v3.7/UpdateWorkitemActualProductionRecords',
+            updateData,
+            {
+                headers: {
+                    'Accept': 'application/json',
+                    'ApiToken': API_TOKEN,
+                    'Content-Type': 'application/json'
+                },
+                httpsAgent: agent // Use the httpsAgent to ignore SSL errors
+            }
+        );
+        res.json(response.data); // Return the API response to the frontend
+    } catch (error) {
+        console.error('Error during task update:', error.response ? error.response.data : error.message);
+        handleError(res, error);
+    }
+});
+
 app.listen(3000, () => {
-  console.log('Server running on http://localhost:3000');
+    console.log('Server running on http://localhost:3000');
 });
