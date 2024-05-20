@@ -43,7 +43,7 @@ const fetchData = async (url, token, params) => {
 
 // Convert date to Darwin time
 const convertToDarwinTime = (date) => {
-  const darwinOffset = 9.5 * 60 * 60 * 1000;
+  const darwinOffset =0;
   return new Date(date.getTime() + darwinOffset);
 };
 

@@ -1,18 +1,28 @@
 {
   "name": "opsfrontendmicro",
   "version": "1.0.0",
-  "description": "",
-  "main": "serverproxy.js",
+  "description": "Your project description",
+  "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "concurrently \"npm run server\" \"npm run client\"",
+    "server": "cd server && npm start",
+    "client": "cd client && npm start"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "author": "Eoghan",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/your-username/your-project/issues"
+  },
+  "homepage": "https://github.com/your-username/your-project#readme",
+  "devDependencies": {
+    "concurrently": "^6.2.0",
+    "nodemon": "^2.0.7"
+  },
   "dependencies": {
-    "axios": "^1.6.8",
-    "cors": "^2.8.5",
-    "dotenv": "^16.4.5",
-    "express": "^4.19.2"
+    "dotenv": "^16.4.5"
   }
 }

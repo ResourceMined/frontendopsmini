@@ -1,0 +1,11 @@
+{
+  "name": "task-manager-client",
+  "version": "1.0.0",
+  "description": "Client for the Task Manager application",
+  "scripts": {
+    "start": "http-server -p 5000 -c-1"
+  },
+  "dependencies": {
+    "http-server": "^14.1.0"
+  }
+}
